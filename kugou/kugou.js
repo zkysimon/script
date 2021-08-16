@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         KuGouSignIn
+// @name         KuGouLogIn&SignIn
 // @namespace    http://tampermonkey.net/
-// @version      1.0.1
-// @description  kugou music sign in automatically
+// @version      1.5.1
+// @description  KuGou Music log in and sign in automatically
 // @author       little star & zkysimon
 // @source       https://zky.gs
 // @match        https://*/*
@@ -14,18 +14,56 @@
 // @require      https://cdn.jsdelivr.net/gh/zkysimon/script@latest/kugou/md5.js
 // ==/UserScript==
 
-if (GM_getValue('KuGousignInfo') != new Date().getDay())
-    signInfo();
+var username = "";    //酷狗id，请前往 https://www.kugou.com/newuc/user/uc/ 登陆并查看。
+var md5password = "";    //密码，请前往 https://md5jiami.bmcx.com/ 加密，32位大写。
+var mid = "";    //kg_mid，音乐人界面获取的cookie中的第一项。
+var token;
 
-function signInfo() {
-    var cookie = "";
-    var kugouid = cookie.match(/KugooID=(\S*)&Ku/)[1];
-    var token = cookie.match(/&t=(\S*)&a/)[1];
+if (GM_getValue('KuGousignInfo') != new Date().getDay()) {
+    login();
+}
+
+function login() {
+    var time = new Date().valueOf();
+    var params = "https://login-user.kugou.com/v1/login/?appid=1058"
+               + "&username=" + username
+               + "&pwd=" + md5password
+               + "&code=&ticket=&clienttime=" + time
+               + "&expire_day=60&autologin=false&redirect_uri=&state=&callback=loginModule.loginCallback"
+               + "&login_ver=1&mobile=&mobile_code=&plat=4&dfid=-"
+               + "&mid=" + mid
+               + "&kguser_jv=180925";
+
+    GM_xmlhttpRequest({
+        method: "get",
+        url: params,
+        headers: {
+            "User-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36 Edg/92.0.902.73",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/atom+xml,application/xml,text/xml",
+            "referer": "https://m3ws.kugou.com/"
+        },
+        onload: function (r) {
+            var errorcode = r.responseText.indexOf("errorCode");
+
+            if (errorcode == -1) {
+                token = r.responseText.match(/"token":"(\S*)",/)[1];
+                signInfo(token);
+            }
+            else {
+                alert("酷狗音乐人登录失败。");
+            }
+        }
+    })
+}
+
+function signInfo(logintoken) {
+
+    var kugouid = username;
     var time = new Date().valueOf();
     var arr = new Array(9);
-
-    arr[0] = "appid=1014";
-    arr[1] = "token=" + token;
+    arr[0] = "appid=1058";
+    arr[1] = "token=" + logintoken;
     arr[2] = "kugouid=" + kugouid;
     arr[3] = "srcappid=2919";
     arr[4] = "clientver=20000";
@@ -43,8 +81,8 @@ function signInfo() {
 
     var signature = hex_md5(str).toUpperCase();
 
-    var address = "https://h5activity.kugou.com/v1/musician/do_signed?appid=1014"
-                + "&token=" + token
+    var address = "https://h5activity.kugou.com/v1/musician/do_signed?appid=1058"
+                + "&token=" + logintoken
                 + "&kugouid=" + kugouid
                 + "&srcappid=2919&clientver=20000"
                 + "&clienttime=" + time
@@ -71,7 +109,7 @@ function signInfo() {
             }
             else {
                 var errmsg = r.responseText.match(/"errmsg":"(\S*)"}/)[1];
-                alert(new Date().toLocaleDateString() + "酷狗音乐人签到失败，因为"+errmsg+".");
+                alert(new Date().toLocaleDateString() + "酷狗音乐人签到失败，因为" + errmsg + "。");
             }
         }
     });
