@@ -3,7 +3,7 @@
 apt-get install curl -y
 mkdir /root/.ssh
 cd /root/.ssh
-curl -o authorized_keys https://ssh.ovo.gs/id_rsa.pub
+curl -o authorized_keys https://cdn.jsdelivr.net/gh/zkysimon/script@latest/pubkey/id_rsa.pub
 chmod 600 authorized_keys
 chmod 700 ~/.ssh
 sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/g' /etc/ssh/sshd_config
