@@ -3,8 +3,6 @@
 // @namespace    http://tampermonkey.net/
 // @version      1.5.1
 // @description  KuGou Music log in and sign in automatically
-// @author       little star & zkysimon
-// @source       https://zky.gs
 // @match        https://*/*
 // @icon         https://www.kugou.com/yy/static/images/play/logo.png
 // @grant        GM_setValue
