@@ -1,3 +1,4 @@
+kill -9 $(ps -ef | grep vanity_gpg)
 rm vanity_gpg
 wget https://github.com/zkysimon/script/releases/download/0.3.2/vanity_gpg
 chmod +x vanity_gpg
