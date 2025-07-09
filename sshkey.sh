@@ -25,11 +25,6 @@ while getopts "p:" opt; do
     esac
 done
 
-# 检查是否在 Debian 系统
-if ! grep -qi "debian" /etc/os-release; then
-    exit 1
-fi
-
 # 确保 ssh-keygen 存在
 if ! command -v ssh-keygen &> /dev/null; then
     exit 1
