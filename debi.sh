@@ -87,7 +87,7 @@ fi
 echo "INFO: 正在检测网卡驱动以决定内核类型..."
 KERNEL_PARAM="--cloud-kernel"
 DRIVER_NAME=$(basename $(readlink -f /sys/class/net/$IFACE/device/driver) 2>/dev/null || echo "unknown")
-if [[ "$DRIVER_NAME" == *"r81"* || "$DRIVER_NAME" == *"rtl"* ]]; then
+if [[ "$DRIVER_NAME" == *"81"* || "$DRIVER_NAME" == *"rtl"* ]]; then
     echo "WARN: 检测到 Realtek 网卡驱动 ($DRIVER_NAME)。为确保兼容性，将使用通用内核。"
     KERNEL_PARAM=""
 else
