@@ -1,11 +1,10 @@
 #!/bin/bash
 #
 # ==============================================================================
-#  带条件化参数的智能 DD 安装 Debian 脚本
+#  带条件化参数的智能 DD 安装 Debian 脚本 (v4 - 精确设备检测)
 #
 #  将此脚本保存为文件 (如 my_debi.sh), 授予执行权限 (chmod +x),
 #  然后通过命令行参数进行自定义安装。
-#  - 参数 --key 和 --install 是可选的，如果未提供，则不会传递给底层脚本。
 # ==============================================================================
 
 # --- 帮助信息函数 ---
@@ -83,16 +82,30 @@ if [ -z "$IP_CIDR" ] || [ -z "$IFACE" ] || [ -z "$GATEWAY" ]; then
     exit 1
 fi
 
-# --- 4. 智能选择内核 ---
-echo "INFO: 正在检测网卡驱动以决定内核类型..."
-KERNEL_PARAM="--cloud-kernel"
-DRIVER_NAME=$(basename $(readlink -f /sys/class/net/$IFACE/device/driver) 2>/dev/null || echo "unknown")
-if [[ "$DRIVER_NAME" == *"81"* || "$DRIVER_NAME" == *"rtl"* ]]; then
-    echo "WARN: 检测到 Realtek 网卡驱动 ($DRIVER_NAME)。为确保兼容性，将使用通用内核。"
+# --- 4. 智能选择内核 (v4 - 精确设备检测, 无回退) ---
+echo "INFO: 正在检测网卡以决定内核类型..."
+KERNEL_PARAM="--cloud-kernel" # 默认使用 cloud-kernel
+
+# 严格检查 lspci 命令是否存在
+if ! command -v lspci &> /dev/null; then
+    echo "WARN: 未找到 lspci 命令。为确保兼容性，将强制使用通用内核。"
     KERNEL_PARAM=""
 else
-    echo "INFO: 检测到驱动 ($DRIVER_NAME)。将使用优化的 Cloud Kernel。"
+    echo "INFO: 检测到 lspci 命令，将进行精确设备类型检测..."
+    # 获取主网卡的PCI总线地址
+    PCI_ADDR=$(basename $(readlink -f /sys/class/net/$IFACE/device))
+    # 获取设备描述信息
+    DEVICE_INFO=$(lspci -s "$PCI_ADDR")
+
+    # 检查设备描述是否包含 "Realtek" 或 "Virtual Function"
+    if echo "$DEVICE_INFO" | grep -iq "Realtek" || echo "$DEVICE_INFO" | grep -iq "Virtual Function"; then
+        echo "WARN: 检测到主网卡 ($IFACE) 为 Realtek 或 VF 设备。描述: [$DEVICE_INFO]。为确保兼容性，将使用通用内核。"
+        KERNEL_PARAM=""
+    else
+        echo "INFO: 主网卡 ($IFACE) 设备类型兼容。将使用优化的 Cloud Kernel。"
+    fi
 fi
+
 
 # ==============================================================================
 #  动态构建命令
@@ -110,17 +123,14 @@ DEBI_ARGS=(
   --password "$CUSTOM_PASSWORD"
 )
 
-# 如果 KERNEL_PARAM 非空, 则添加内核参数
 if [ -n "$KERNEL_PARAM" ]; then
   DEBI_ARGS+=("$KERNEL_PARAM")
 fi
 
-# 如果用户通过 --key 提供了 URL, 则添加密钥参数
 if [ -n "$CUSTOM_KEYS_URL" ]; then
   DEBI_ARGS+=(--authorized-keys-url "$CUSTOM_KEYS_URL")
 fi
 
-# 如果用户通过 --install 提供了软件包列表, 则添加安装参数
 if [ -n "$INSTALL_PACKAGES" ]; then
   DEBI_ARGS+=(--install "$INSTALL_PACKAGES")
 fi
@@ -138,8 +148,7 @@ echo "--------------------------------------------------"
 echo "将在 5 秒后开始执行 DD 安装，按 Ctrl+C 取消..."
 sleep 5
 
-# --- 7. 执行 DD 安装脚本 ---
-curl -fLO https://raw.githubusercontent.com/bohanyang/debi/master/debi.sh && \
-chmod a+rx debi.sh && \
-./debi.sh "${DEBI_ARGS[@]}" && \
+# --- 7. 执行 DD 安装脚本 (通过管道) ---
+echo "INFO: 正在通过管道执行安装脚本，不会在本地保存文件..."
+curl -fsSL https://raw.githubusercontent.com/bohanyang/debi/master/debi.sh | bash -s -- "${DEBI_ARGS[@]}" && \
 shutdown -r now
