@@ -19,7 +19,7 @@ usage() {
   echo "  --install \"包列表\"    (可选) 用引号括起来的、空格分隔的预装软件包列表。"
   echo "  -h, --help            显示此帮助信息"
   echo
-  echo "示例: ./my_debi.sh --user admin --password \"MyPass\" --key \"https://github.com/user.keys\""
+  echo "示例: ./debi.sh --user admin --password \"MyPass\" --key \"https://github.com/user.keys\""
 }
 
 # ==============================================================================
@@ -148,7 +148,8 @@ echo "--------------------------------------------------"
 echo "将在 5 秒后开始执行 DD 安装，按 Ctrl+C 取消..."
 sleep 5
 
-# --- 7. 执行 DD 安装脚本 (通过管道) ---
-echo "INFO: 正在通过管道执行安装脚本，不会在本地保存文件..."
-curl -fsSL https://raw.githubusercontent.com/bohanyang/debi/master/debi.sh | bash -s -- "${DEBI_ARGS[@]}" && \
+# --- 7. 执行 DD 安装脚本 ---
+curl -fLO https://raw.githubusercontent.com/bohanyang/debi/master/debi.sh && \
+chmod a+rx debi.sh && \
+./debi.sh "${DEBI_ARGS[@]}" && \
 shutdown -r now
