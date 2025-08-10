@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # ==============================================================================
-#  带条件化参数的智能 DD 安装 Debian 脚本 (v4 - 精确设备检测)
+#  带条件化参数的智能 DD 安装 Debian 脚本 (v5 - 下载后执行)
 #
 #  将此脚本保存为文件 (如 my_debi.sh), 授予执行权限 (chmod +x),
 #  然后通过命令行参数进行自定义安装。
@@ -19,7 +19,7 @@ usage() {
   echo "  --install \"包列表\"    (可选) 用引号括起来的、空格分隔的预装软件包列表。"
   echo "  -h, --help            显示此帮助信息"
   echo
-  echo "示例: ./debi.sh --user admin --password \"MyPass\" --key \"https://github.com/user.keys\""
+  echo "示例: ./my_debi.sh --user admin --password \"MyPass\" --key \"https://github.com/user.keys\""
 }
 
 # ==============================================================================
@@ -82,22 +82,18 @@ if [ -z "$IP_CIDR" ] || [ -z "$IFACE" ] || [ -z "$GATEWAY" ]; then
     exit 1
 fi
 
-# --- 4. 智能选择内核 (v4 - 精确设备检测, 无回退) ---
+# --- 4. 智能选择内核 ---
 echo "INFO: 正在检测网卡以决定内核类型..."
-KERNEL_PARAM="--cloud-kernel" # 默认使用 cloud-kernel
+KERNEL_PARAM="--cloud-kernel"
 
-# 严格检查 lspci 命令是否存在
 if ! command -v lspci &> /dev/null; then
     echo "WARN: 未找到 lspci 命令。为确保兼容性，将强制使用通用内核。"
     KERNEL_PARAM=""
 else
     echo "INFO: 检测到 lspci 命令，将进行精确设备类型检测..."
-    # 获取主网卡的PCI总线地址
     PCI_ADDR=$(basename $(readlink -f /sys/class/net/$IFACE/device))
-    # 获取设备描述信息
     DEVICE_INFO=$(lspci -s "$PCI_ADDR")
 
-    # 检查设备描述是否包含 "Realtek" 或 "Virtual Function"
     if echo "$DEVICE_INFO" | grep -iq "Realtek" || echo "$DEVICE_INFO" | grep -iq "Virtual Function"; then
         echo "WARN: 检测到主网卡 ($IFACE) 为 Realtek 或 VF 设备。描述: [$DEVICE_INFO]。为确保兼容性，将使用通用内核。"
         KERNEL_PARAM=""
@@ -105,7 +101,6 @@ else
         echo "INFO: 主网卡 ($IFACE) 设备类型兼容。将使用优化的 Cloud Kernel。"
     fi
 fi
-
 
 # ==============================================================================
 #  动态构建命令
@@ -148,8 +143,17 @@ echo "--------------------------------------------------"
 echo "将在 5 秒后开始执行 DD 安装，按 Ctrl+C 取消..."
 sleep 5
 
-# --- 7. 执行 DD 安装脚本 ---
-curl -fLO https://raw.githubusercontent.com/bohanyang/debi/master/debi.sh && \
-chmod a+rx debi.sh && \
+# --- 7. 执行 DD 安装脚本 (下载后执行) ---
+echo "INFO: 正在下载底层安装脚本 (debi.sh)..."
+curl -fLO https://raw.githubusercontent.com/bohanyang/debi/master/debi.sh
+
+# 检查脚本是否下载成功
+if [ ! -f "debi.sh" ]; then
+    echo "ERROR: 下载 debootstrap 脚本 (debi.sh) 失败。"
+    exit 1
+fi
+
+echo "INFO: 下载完成，授予权限并开始执行安装..."
+chmod +x debi.sh
 ./debi.sh "${DEBI_ARGS[@]}" && \
 shutdown -r now
