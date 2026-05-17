@@ -296,8 +296,8 @@ generate_values() {
 generate_x25519() {
   local output
   output="$(xray x25519)"
-  PRIVATE_KEY="$(awk -F': ' '/Private key/ {print $2}' <<<"${output}")"
-  PUBLIC_KEY="$(awk -F': ' '/Public key/ {print $2}' <<<"${output}")"
+  PRIVATE_KEY="$(awk -F':[[:space:]]*' '/^(Private key|PrivateKey):/ {print $2; exit}' <<<"${output}")"
+  PUBLIC_KEY="$(awk -F':[[:space:]]*' '/^(Public key|PublicKey|Password \(PublicKey\)):/ {print $2; exit}' <<<"${output}")"
 
   if [[ -z "${PRIVATE_KEY}" || -z "${PUBLIC_KEY}" ]]; then
     echo "${output}" >&2
