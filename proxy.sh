@@ -16,10 +16,15 @@ UUID=""
 SHORT_ID=""
 SPIDER_X=""
 NO_FIREWALL=0
+OS_PRETTY="unknown"
 
 usage() {
   cat <<EOF
-Xray VLESS + XHTTP + REALITY one-key installer for Debian 13.
+Xray VLESS + XHTTP + REALITY one-key installer.
+
+Supported systems:
+  Debian/Ubuntu, RHEL/CentOS/Rocky/Alma/Fedora, Arch, openSUSE.
+  systemd is required.
 
 Usage:
   sudo bash ${SCRIPT_NAME} [options]
@@ -124,29 +129,54 @@ parse_args() {
 }
 
 detect_os() {
-  if [[ ! -r /etc/os-release ]]; then
-    die "Cannot read /etc/os-release"
-  fi
-
-  # shellcheck disable=SC1091
-  . /etc/os-release
-
-  if [[ "${ID:-}" != "debian" ]]; then
-    log "Warning: this script is tuned for Debian 13, current ID=${ID:-unknown}."
-  elif [[ "${VERSION_ID:-}" != "13" ]]; then
-    log "Warning: this script is tuned for Debian 13, current VERSION_ID=${VERSION_ID:-unknown}."
+  if [[ -r /etc/os-release ]]; then
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    OS_PRETTY="${PRETTY_NAME:-${ID:-unknown}}"
   fi
 
   if ! command -v systemctl >/dev/null 2>&1; then
-    die "systemd is required."
+    die "systemd is required. Alpine/OpenRC and non-systemd containers are not supported."
   fi
+
+  log "Detected system: ${OS_PRETTY}"
+}
+
+run_pkg_update_install() {
+  if command -v apt-get >/dev/null 2>&1; then
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y ca-certificates curl openssl unzip iproute2 coreutils
+    return 0
+  fi
+
+  if command -v dnf >/dev/null 2>&1; then
+    dnf install -y ca-certificates curl openssl unzip iproute coreutils gawk
+    return 0
+  fi
+
+  if command -v yum >/dev/null 2>&1; then
+    yum install -y ca-certificates curl openssl unzip iproute coreutils gawk
+    return 0
+  fi
+
+  if command -v pacman >/dev/null 2>&1; then
+    pacman -Sy --needed --noconfirm ca-certificates curl openssl unzip iproute2 coreutils gawk
+    return 0
+  fi
+
+  if command -v zypper >/dev/null 2>&1; then
+    zypper --non-interactive refresh
+    zypper --non-interactive install ca-certificates curl openssl unzip iproute2 coreutils gawk
+    return 0
+  fi
+
+  die "No supported package manager found. Supported: apt, dnf, yum, pacman, zypper."
 }
 
 install_dependencies() {
   log "Installing base dependencies"
-  export DEBIAN_FRONTEND=noninteractive
-  apt-get update
-  apt-get install -y ca-certificates curl openssl iproute2 coreutils
+  run_pkg_update_install
 }
 
 install_xray() {
@@ -393,9 +423,13 @@ write_server_config() {
 EOF
 
   local nobody_group
-  nobody_group="$(id -gn nobody 2>/dev/null || printf '%s\n' nogroup)"
-  chown "root:${nobody_group}" "${CONFIG_FILE}" 2>/dev/null || chown root:root "${CONFIG_FILE}"
-  chmod 640 "${CONFIG_FILE}" 2>/dev/null || chmod 644 "${CONFIG_FILE}"
+  nobody_group="$(id -gn nobody 2>/dev/null || printf '%s\n' nobody)"
+  if chown "root:${nobody_group}" "${CONFIG_FILE}" 2>/dev/null; then
+    chmod 640 "${CONFIG_FILE}" 2>/dev/null || chmod 644 "${CONFIG_FILE}"
+  else
+    chown root:root "${CONFIG_FILE}" 2>/dev/null || true
+    chmod 644 "${CONFIG_FILE}"
+  fi
 }
 
 urlencode() {
